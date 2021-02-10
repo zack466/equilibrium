@@ -219,4 +219,7 @@ def plot(
     if show_title:
         plt.title(R.equation())
 
+    plt.xlabel("t")
+    plt.ylabel("Concentration")
+
     plt.savefig("plot.png")
