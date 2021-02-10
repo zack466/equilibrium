@@ -1,14 +1,13 @@
 import equilibrium.equilibrium as eq
 
-# config
+# Reaction config
 R = eq.Reaction(kf=0.8, kr=1.2)
 
-A = eq.Element("A", 1, 0.5)
-B = eq.Element("B", 2, 1)
-R.add_reactant(A)
-R.add_reactant(B)
+A = eq.Element(name="A", coeff=1, init_conc=0.5)
+B = eq.Element(name="B", coeff=2, init_conc=1)
+R.add_reactants([A, B])
 
-C = eq.Element("C", 2, 0)
+C = eq.Element(name="C", coeff=2, init_conc=0)
 R.add_product(C)
 
 x = eq.Event(eq.ETYPE.update_conc, 20, ("C", 0.25), name="add_A")
