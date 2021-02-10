@@ -1,4 +1,4 @@
-import equilibrium.equilibrium as eq
+import equilibrium as eq
 
 # Reaction config
 R = eq.Reaction(kf=0.8, kr=1.2)
@@ -10,7 +10,7 @@ R.add_reactants([A, B])
 C = eq.Element(name="C", coeff=2, init_conc=0)
 R.add_product(C)
 
-x = eq.Event(eq.ETYPE.update_conc, 20, ("C", 0.25), name="add_A")
+x = eq.Event(eq.ETYPE.update_conc, 20, ("C", 0.25), name="add_C")
 R.add_event(x)
 
 # run experiment

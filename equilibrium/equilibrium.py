@@ -3,7 +3,6 @@ from functools import reduce
 import enum
 import seaborn as sns
 from matplotlib import pyplot as plt
-from copy import deepcopy
 
 prod = lambda x: reduce(mul, x, 1)
 
