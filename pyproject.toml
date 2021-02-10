@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "equilibrium-sim"
+name = "equilibrium"
 version = "0.1.0"
 description = ""
 authors = ["zack466"]
