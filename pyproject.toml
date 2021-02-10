@@ -5,7 +5,7 @@ description = ""
 authors = ["zack466"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.6"
 matplotlib = "^3.3.3"
 seaborn = "^0.11.1"
 numpy = "^1.19.5"
