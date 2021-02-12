@@ -74,7 +74,7 @@ class Reaction:
         forward, backward = self.rates()
         numer = backward / self.kr
         denom = forward / self.kf
-        if denom == 0:
+        if denom == 0:  # prevent divide-by-zero errors
             denom += 1e-6
         return numer / denom
 
@@ -108,6 +108,7 @@ class Reaction:
 
     def add_event(self, event):
         self.events.append(event)
+        # ensure reaction does not end until all events occur
         self.min_end_time = max(self.min_end_time, event.time)
 
     def add_events(self, event_list):
@@ -122,7 +123,6 @@ class Reaction:
             if e.time == self.t:
                 self.do_event(e)
                 self.events.pop(i)
-                i = 0
             else:
                 i += 1
 
@@ -134,6 +134,7 @@ class Reaction:
                 if x.name == name:
                     x.conc += val
                 else:
+                    # to keep all concentration histories in sync
                     x.conc = x.conc
             self.times.append(self.t)
             self.Qhistory.append(self.reaction_quotient())
@@ -148,6 +149,7 @@ class Reaction:
             print(f"Event at {event.time} not found")
 
     def equation(self):
+        # used to generate title of graph
         strs = []
         for i in range(len(self.reactants)):
             r = self.reactants[i]
