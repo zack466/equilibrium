@@ -1,23 +1,14 @@
 import equilibrium as eq
 
 # Reaction config
-R = eq.Reaction(kf=0.8, kr=1.2)
-
 A = eq.Element(name="A", coeff=1, init_conc=0.5)
-B = eq.Element(name="B", coeff=2, init_conc=1)
-R.add_reactants([A, B])
-
-C = eq.Element(name="C", coeff=2, init_conc=0)
-R.add_product(C)
-
-x = eq.Event(eq.ETYPE.update_conc, 20, ("C", 0.25), name="add_C")
-R.add_event(x)
+B = eq.Element(name="B", coeff=2, init_conc=0.75)
+C = eq.Element(name="C", coeff=1, init_conc=0)
+X = eq.Event(eq.ETYPE.update_conc, 30, ("C", 0.2), name="add C")
 
 # run experiment
+R = eq.Reaction(K=1.2, reactants=[A, B], products=[C], events=[X])
 R.react_until_eq(threshold=0.001)
 
 # plotting
-elements = [A, B, C]
-eq.plot(elements, R, [x], show_events=True)
-
-# plt.show()
+R.plot(show_events=True)

@@ -9,8 +9,7 @@ prod = lambda x: reduce(mul, x, 1)
 
 class ETYPE(enum.Enum):
     update_conc = 0  # assumes value = (name_of_element, change_in_conc)
-    update_kf = 1  # assumes value = change in kf
-    update_kr = 2  # assumes value = change in kr
+    update_K = 1  # assumes value = lambda from K to new_K
 
 
 class Event:
@@ -18,37 +17,43 @@ class Event:
         self.event_type = event_type
         self.time = time
         self.value = value
-        self.name = name
+        if name == "":
+            self.name = f"{event_type}, t={time}, {value}"
+        else:
+            self.name = name
+        self.completed = False
 
 
 class Reaction:
-    def __init__(self, kf=1, kr=1):
-        self.reactants = []
-        self.products = []
-        self.events = []
+    def __init__(self, K=1, reactants=[], products=[], events=[]):
         self.min_end_time = 0
-        self.dt = 0.05
+        self.dt = 0.03
         self.t = 0
-        self.kf = kf  # forward reaction rate constnat
-        self.kr = kr  # reverse reaction rate constant
+
+        self.K = K
+        assert K != 0, "K cannot be 0"
+
+        self.reactants = reactants
+        self.products = products
+
+        self.events = []
+        for event in events:
+            self.events.append(event)
+            self.min_end_time = max(self.min_end_time, event.time)
+
         self.times = [0]  # x-values for plotting
-        self.Qhistory = [self.reaction_quotient()]
-        self.Khistory = [self.K()]
+        self.Qhistory = [self.reaction_quotient(*self.rates())]
+        self.Khistory = [self.K]
 
     def rates(self):
         # calculates forward and backwards rates
-        forward = prod(map(lambda x: x.conc ** x.coeff, self.reactants)) * self.kf
-        backward = prod(map(lambda x: x.conc ** x.coeff, self.products)) * self.kr
+        # kf = K, kr = 1, so kf/kr = K
+        forward = prod(map(lambda x: x.conc ** x.coeff, self.reactants)) * self.K
+        backward = prod(map(lambda x: x.conc ** x.coeff, self.products))
         return forward, backward
 
-    def react(self):
+    def react(self, forward, backward):
         # simulates a single reaction and updates state
-        if self.t == 0:
-            self.Qhistory = [self.reaction_quotient()]
-
-        self.do_events()
-
-        forward, backward = self.rates()
         for r in self.reactants:
             r.conc -= self.dt * r.coeff * (forward - backward)
         for p in self.products:
@@ -56,10 +61,10 @@ class Reaction:
 
         self.t += 1
         self.times.append(self.t)
-        self.Qhistory.append(self.reaction_quotient())
-        self.Khistory.append(self.K())
+        self.Qhistory.append(self.reaction_quotient(forward, backward))
+        self.Khistory.append(self.K)
 
-    def react_until_eq(self, threshold=0.005):
+    def react_until_eq(self, threshold=0.001):
         # reacts until the net change in concentrations is less than threshold
         # will not stop reacting until all events have occurred
         while True:
@@ -67,20 +72,16 @@ class Reaction:
             if abs(forward - backward) < threshold and self.t > self.min_end_time:
                 break
             else:
-                self.react()
+                self.do_events()
+                self.react(*self.rates())
 
-    def reaction_quotient(self):
+    def reaction_quotient(self, forward, backward):
         # calculates Q, the reaction quotient
-        forward, backward = self.rates()
-        numer = backward / self.kr
-        denom = forward / self.kf
+        numer = backward
+        denom = forward / self.K
         if denom == 0:  # prevent divide-by-zero errors
             denom += 1e-6
         return numer / denom
-
-    def K(self):
-        # calculates the equilibrium constant K(c)
-        return self.kf / self.kr
 
     def print_state(self):
         # for debugging
@@ -92,37 +93,14 @@ class Reaction:
         for p in self.products:
             print("\t\t" + str(p))
 
-    def add_reactant(self, r):
-        self.reactants.append(r)
-
-    def add_reactants(self, r_list):
-        for r in r_list:
-            self.reactants.append(r)
-
-    def add_product(self, p):
-        self.products.append(p)
-
-    def add_products(self, p_list):
-        for p in p_list:
-            self.products.append(p)
-
-    def add_event(self, event):
-        self.events.append(event)
-        # ensure reaction does not end until all events occur
-        self.min_end_time = max(self.min_end_time, event.time)
-
-    def add_events(self, event_list):
-        for event in event_list:
-            self.add_event(event)
-
     def do_events(self):
         i = 0
         # activates any events that should occur at this timestep
         while i < len(self.events):
             e = self.events[i]
-            if e.time == self.t:
+            if e.time == self.t and not e.completed:
                 self.do_event(e)
-                self.events.pop(i)
+                e.completed = True
             else:
                 i += 1
 
@@ -137,14 +115,11 @@ class Reaction:
                     # to keep all concentration histories in sync
                     x.conc = x.conc
             self.times.append(self.t)
-            self.Qhistory.append(self.reaction_quotient())
-            self.Khistory.append(self.K())
-        elif t == ETYPE.update_kf:
+            self.Qhistory.append(self.reaction_quotient(*self.rates()))
+            self.Khistory.append(self.K)
+        elif t == ETYPE.update_K:
             val = event.value
-            self.kf += val
-        elif t == ETYPE.update_kr:
-            val = event.value
-            self.kr += val
+            self.K = val(self.K)
         else:
             print(f"Event at {event.time} not found")
 
@@ -163,6 +138,53 @@ class Reaction:
             if i < len(self.products) - 1:
                 strs.append(" + ")
         return "".join(strs)
+
+    def plot(
+        self,
+        show_events=False,
+        show_legend=True,
+        show_reaction=False,
+        show_title=True,
+        plot_name="plot.png",
+    ):
+        elements = self.reactants + self.products
+        line_colors = sns.color_palette("Set1", len(elements) + 2)
+        for i, e in enumerate(elements):
+            plt.plot(self.times, e.history, color=line_colors[i], label=e.name)
+
+        if show_reaction:
+            plt.plot(
+                self.times,
+                self.Qhistory,
+                color=line_colors[-2],
+                label="Q",
+                linestyle="dashed",
+            )
+            plt.plot(
+                self.times,
+                self.Khistory,
+                color=line_colors[-1],
+                label="K",
+                linestyle="dashed",
+            )
+
+        if show_events:
+            event_colors = sns.color_palette("Set2", len(self.events))
+            for i, e in enumerate(self.events):
+                plt.axvline(
+                    e.time, color=event_colors[i], label=e.name, linestyle="dashed"
+                )
+
+        if show_legend:
+            plt.legend()
+
+        if show_title:
+            plt.title(self.equation())
+
+        plt.xlabel("t")
+        plt.ylabel("Concentration")
+
+        plt.savefig(plot_name)
 
 
 class Element:
@@ -184,44 +206,3 @@ class Element:
         # custom setter to keep track of history
         self.history.append(newconc)
         self._conc = newconc
-
-
-def plot(
-    elements,
-    reaction,
-    events=[],
-    show_events=False,
-    show_legend=True,
-    show_reaction=False,
-    show_title=True,
-):
-    R = reaction
-    line_colors = sns.color_palette("Set1", len(elements) + 2)
-    for i, e in enumerate(elements):
-        plt.plot(R.times, e.history, color=line_colors[i], label=e.name)
-
-    if show_reaction:
-        plt.plot(
-            R.times, R.Qhistory, color=line_colors[-2], label="Q", linestyle="dashed"
-        )
-        plt.plot(
-            R.times, R.Khistory, color=line_colors[-1], label="K", linestyle="dashed"
-        )
-
-    if show_events:
-        event_colors = sns.color_palette("Set2", len(events))
-        for i, e in enumerate(events):
-            plt.vlines(
-                e.time, 0, 1, color=event_colors[i], label=e.name, linestyle="dashed"
-            )
-
-    if show_legend:
-        plt.legend()
-
-    if show_title:
-        plt.title(R.equation())
-
-    plt.xlabel("t")
-    plt.ylabel("Concentration")
-
-    plt.savefig("plot.png")
